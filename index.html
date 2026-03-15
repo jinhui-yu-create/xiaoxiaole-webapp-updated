@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>消消乐学习游戏</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* Import Google font for a friendly look */
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Fredoka+One&display=swap');
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1 id="level-title">消消乐学习游戏</h1>
+        <p id="story"></p>
+      </header>
+      <div id="scoreboard">
+        <span id="level-indicator"></span>
+        <span id="score-display">得分: <span id="score">0</span></span>
+        <!-- Timer display shows the countdown for each level -->
+        <span id="timer-display">时间: <span id="time-left">60</span> 秒</span>
+      </div>
+      <div id="board"></div>
+      <button id="next-level" style="display:none">下一关</button>
+      <!-- Game over modal shown when the timer runs out -->
+      <div id="game-over-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+          <p id="game-over-text"></p>
+          <div class="input-group">
+            <label for="player-name">Name:</label>
+            <input type="text" id="player-name" />
+          </div>
+          <button id="submit-name">提交</button>
+          <button id="play-again">再玩一次</button>
+        </div>
+      </div>
+
+      <!-- Leaderboard section for displaying saved scores -->
+      <div id="leaderboard-section" style="display:none;">
+        <h2>Leaderboard</h2>
+        <ol id="leaderboard-list"></ol>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
