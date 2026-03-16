@@ -1,207 +1,408 @@
-/* General page styling */
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Noto Sans SC', sans-serif;
-  background: #fdf6e3;
-  color: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>词汇大冒险 / Lexicon Adventure</title>
+<style>
+    body {
+        font-family: 'Comic Sans MS', 'Arial', sans-serif;
+        background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+        min-height: 100vh;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        color: #333;
+    }
+    h1 {
+        color: #fff;
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        margin-bottom: 5px;
+        letter-spacing: 2px;
+    }
+    .status-bar {
+        display: flex;
+        gap: 30px;
+        font-size: 1.2em;
+        color: #fff;
+        margin-bottom: 20px;
+        font-weight: bold;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+    #game-board {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        max-width: 650px;
+        justify-content: center;
+        perspective: 1000px;
+    }
+    .tile {
+        width: 130px;
+        height: 80px;
+        background-color: #fff;
+        border-radius: 15px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #4a4a4a;
+        cursor: pointer;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        user-select: none;
+        text-align: center;
+        padding: 10px;
+        box-sizing: border-box;
+        border: 3px solid transparent;
+    }
+    .tile:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .tile.selected {
+        background-color: #fff3cd;
+        transform: scale(1.08);
+        border-color: #ffc107;
+        color: #d35400;
+        box-shadow: 0 0 15px #ffc107;
+    }
+    /* 答对时的特效 */
+    .tile.matched {
+        animation: burst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        pointer-events: none;
+    }
+    @keyframes burst {
+        0% { transform: scale(1); background-color: #55efc4; color: #fff; opacity: 1; }
+        50% { transform: scale(1.2) rotate(10deg); background-color: #00b894; box-shadow: 0 0 20px #00b894; opacity: 1; }
+        100% { transform: scale(0); opacity: 0; }
+    }
+    /* 答错时的特效 */
+    .tile.shake {
+        animation: shake 0.4s;
+        background-color: #ff7675;
+        color: #fff;
+        border-color: #d63031;
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px) rotate(-5deg); }
+        50% { transform: translateX(8px) rotate(5deg); }
+        75% { transform: translateX(-8px) rotate(-5deg); }
+    }
+    
+    /* 故事弹窗样式 */
+    #story-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        backdrop-filter: blur(5px);
+    }
+    .modal-content {
+        background: #fff;
+        padding: 40px;
+        border-radius: 25px;
+        max-width: 500px;
+        text-align: center;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    @keyframes popIn {
+        from { transform: scale(0.4); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+    .modal-content h2 {
+        color: #8e44ad;
+        margin-top: 0;
+        font-size: 2em;
+    }
+    .modal-content p {
+        font-size: 1.3em;
+        line-height: 1.6;
+        color: #2c3e50;
+        margin: 25px 0;
+        font-style: italic;
+    }
+    button {
+        background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+        color: #fff;
+        border: none;
+        padding: 12px 30px;
+        font-size: 1.2em;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        font-weight: bold;
+    }
+    button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
+    }
+</style>
+</head>
+<body>
+
+<h1>词汇大冒险 / Lexicon Adventure</h1>
+<div class="status-bar">
+    <div id="level-info">Level: 1</div>
+    <div id="progress-info">Words Mastered: 0</div>
+</div>
+<div id="game-board"></div>
+
+<div id="story-modal">
+    <div class="modal-content">
+        <h2 id="modal-title">Level Complete!</h2>
+        <p id="story-text"></p>
+        <button id="next-btn" onclick="nextLevel()">Continue Journey</button>
+    </div>
+</div>
+
+<script>
+// 音效系统
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-#app {
-  text-align: center;
-  width: 90%;
-  max-width: 800px;
-  margin: auto;
+function playDing() {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime); // C6
+    osc.frequency.exponentialRampToValueAtTime(2093, audioCtx.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
-header {
-  margin-bottom: 10px;
+function playError() {
+    initAudio();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
 }
 
-#level-title {
-  font-family: 'Fredoka One', cursive;
-  color: #ff6347;
-  margin: 10px 0;
+function playTada() {
+    initAudio();
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C E G C
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.1 + i*0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.0);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + i*0.1);
+        osc.stop(audioCtx.currentTime + 1.2);
+    });
 }
 
-#story {
-  font-size: 1.1rem;
-  color: #555;
-  margin: 0 0 10px 0;
+// 基于HSK3提取的庞大词汇库
+const rawVocabStr = "爱|love,八|eight,爸爸|father,杯子|cup,北京|Beijing,本|copy,不客气|You're welcome,不|not,菜|vegetable,茶|tea,吃|eat,出租车|taxi,打电话|call,大|big,的|of,点|o'clock,电脑|computer,电视|TV,电影|movie,东西|thing,都|all,读|read,对不起|sorry,多|how many,多少|how much,儿子|son,二|two,饭店|restaurant,飞机|plane,分钟|minute,高兴|happy,个|piece,工作|job,汉语|Chinese,好|good,号|number,喝|drink,和|and,很|very,后面|behind,回|return,会|can,几|several,家|home,叫|call,今天|today,九|nine,开|open,看|look,看见|see,块|piece,来|come,老师|teacher,了|past tense,冷|cold,里|inside,零|zero,六|six,妈妈|mother,吗|question,买|buy,没关系|It's ok,没有|have not,米饭|rice,明天|tomorrow,名字|name,哪|which,哪儿|where,那|that,呢|question,能|can,你|you,年|year,女儿|daughter,朋友|friend,漂亮|beautiful,苹果|apple,七|seven,钱|money,前面|front,请|please,去|go,热|hot,人|person,认识|know,三|three,商店|shop,上|up,上午|morning,少|few,谁|who,什么|what,十|ten,时候|time,是|is,书|book,水|water,水果|fruit,睡觉|sleep,说|speak,说话|talk,四|four,岁|age,他|he,她|she,太|too,天气|weather,听|listen,同学|classmate,喂|hello,我|I,我们|we,五|five,喜欢|like,下|down,下午|afternoon,下雨|rain,先生|Mr.,现在|now,想|want,小|small,小姐|Miss,些|some,写|write,谢谢|thank you,星期|week,学生|student,学习|study,学校|school,一|one,一点儿|a little,衣服|clothes,医生|doctor,医院|hospital,椅子|chair,有|have,月|month,再见|goodbye,在|at,怎么|how,怎么样|how about,这|this,中国|China,中午|noon,住|live,桌子|table,字|character,昨天|yesterday,坐|sit,做|do,吧|suggestion,白|white,百|hundred,帮助|help,报纸|newspaper,比|compare,别|don't,长|long,唱歌|sing,出|out,穿|wear,次|time,从|from,错|wrong,打篮球|play basketball,大家|everyone,到|arrive,得|must,等|wait,弟弟|younger brother,第一|first,懂|understand,对|correct,房间|room,非常|very,服务员|waiter,高|high,告诉|tell,哥哥|older brother,给|give,公共汽车|bus,公司|company,狗|dog,贵|expensive,过|pass,还|still,孩子|child,好吃|delicious,黑|black,红|red,欢迎|welcome,回答|answer,火车站|train station,机场|airport,鸡蛋|egg,件|piece,教室|classroom,姐姐|older sister,介绍|introduce,进|enter,近|near,就|then,觉得|feel,咖啡|coffee,开始|start,考试|exam,可能|maybe,可以|can,课|class,快|fast,快乐|happy,累|tired,离|leave,两|two,路|road,旅游|travel,卖|sell,慢|slow,忙|busy,猫|cat,每|every,妹妹|younger sister,门|door,男|man,您|you (polite),牛奶|milk,女|woman,旁边|beside,跑步|run,便宜|cheap,票|ticket,妻子|wife,起床|get up,千|thousand,铅笔|pencil,晴|sunny,去年|last year,让|let,日|day,上班|go to work,身体|body,生病|sick,生日|birthday,时间|time,事情|matter,手表|watch,手机|mobile phone,送|send,虽然|although,它|it,踢足球|play football,题|question,跳舞|dance,外|outside,完|finish,玩|play,晚上|evening,为什么|why,问|ask,问题|question,西瓜|watermelon,希望|hope,洗|wash,小时|hour,笑|laugh,新|new,姓|surname,休息|rest,雪|snow,颜色|color,眼睛|eye,羊肉|mutton,药|medicine,要|want,也|also,一下|a bit,一起|together,已经|already,意思|meaning,遇到|meet,元|yuan,愿意|willing,月亮|moon,越|more,站|stand,张|piece,照顾|take care,照片|photo,照相机|camera,只|only,中间|middle";
+
+// 解析词库
+let allWords = rawVocabStr.split(',').map(item => {
+    let parts = item.split('|');
+    return { zh: parts[0], en: parts[1] };
+});
+
+// 打乱数组 (Fisher-Yates)
+function shuffle(array) {
+    let currentIndex = array.length, randomIndex;
+    while (currentIndex !== 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    return array;
 }
 
-#scoreboard {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 1rem;
-  color: #333;
-  padding: 0 5px;
+// 初始化时打乱所有词汇
+allWords = shuffle(allWords);
+
+// 英文故事线
+const storyLines = [
+    "Welcome to the magical land of Lexicon! Your journey to find the lost Crown of Wisdom begins today. Keep going!",
+    "You enter the Whispering Woods. The trees are humming with ancient words. You're doing great!",
+    "A friendly talking fox joins your quest! He points towards the glowing mountains in the distance.",
+    "You successfully cross the Bridge of Riddles. The air feels cooler, and the mountain peak is visible now.",
+    "Hidden inside a cave, you find a glowing crystal. It lights up your path in the dark. Amazing!",
+    "You've reached the Crystal Caverns! The walls sparkle with knowledge. You are getting closer.",
+    "You solved the Cavern's maze! You can see the sunlight at the end of the tunnel.",
+    "You step out into the Valley of Stars. The sky is breathtaking, and you feel your vocabulary power growing!",
+    "A giant eagle offers you a ride across the Great Canyon. The Castle of Wisdom is finally in sight!",
+    "You land at the foot of the Castle. The massive doors are locked, but your words are the key!"
+];
+
+let globalWordIndex = 0;
+let currentLevel = 1;
+let masteredCount = 0;
+let firstSelected = null;
+let remainingPairs = 0;
+let boardLocked = false;
+
+const board = document.getElementById('game-board');
+const levelInfo = document.getElementById('level-info');
+const progressInfo = document.getElementById('progress-info');
+const modal = document.getElementById('story-modal');
+const modalTitle = document.getElementById('modal-title');
+const storyText = document.getElementById('story-text');
+const nextBtn = document.getElementById('next-btn');
+
+function getPairsForLevel(level) {
+    if (level === 1) return 3;
+    if (level === 2) return 4;
+    if (level === 3) return 5;
+    if (level === 4) return 6;
+    return 8; 
 }
 
-#board {
-  display: grid;
-  gap: 4px;
-  margin: auto;
-  background-color: #fff;
-  padding: 4px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+function loadLevel() {
+    board.innerHTML = '';
+    firstSelected = null;
+    boardLocked = false;
+    
+    levelInfo.innerText = "Level: " + currentLevel;
+    progressInfo.innerText = "Words Mastered: " + masteredCount;
+    
+    let pairCount = getPairsForLevel(currentLevel);
+    
+    if (globalWordIndex + pairCount > allWords.length) {
+        pairCount = allWords.length - globalWordIndex;
+    }
+    
+    remainingPairs = pairCount;
+    
+    if (pairCount === 0) {
+        showWinScreen();
+        return;
+    }
+
+    let levelPairs = allWords.slice(globalWordIndex, globalWordIndex + pairCount);
+    globalWordIndex += pairCount;
+    
+    let tiles = [];
+    levelPairs.forEach((pair, index) => {
+        tiles.push({ text: pair.zh, id: index, type: 'zh' });
+        tiles.push({ text: pair.en, id: index, type: 'en' });
+    });
+    
+    tiles = shuffle(tiles);
+    
+    tiles.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'tile';
+        div.innerText = item.text;
+        div.dataset.id = item.id;
+        div.dataset.type = item.type;
+        div.onclick = () => handleTileClick(div);
+        board.appendChild(div);
+    });
 }
 
-/* Tile styling */
-.tile {
-  position: relative;
-  /* Increase tile size to make the characters and pinyin easier to read. */
-  width: 90px;
-  height: 90px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border-radius: 8px;
-  /* Base font size for the tile; actual sizes are set on the main and sub spans */
-  font-size: 1rem;
-  /* Use black text for all characters and translations */
-  color: #000;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.1s ease;
+function handleTileClick(tile) {
+    if (boardLocked || tile.classList.contains('matched') || tile.classList.contains('selected')) return;
+    
+    initAudio();
+    tile.classList.add('selected');
+    
+    if (!firstSelected) {
+        firstSelected = tile;
+    } else {
+        boardLocked = true;
+        const secondSelected = tile;
+        
+        if (firstSelected.dataset.id === secondSelected.dataset.id && 
+            firstSelected.dataset.type !== secondSelected.dataset.type) {
+            
+            // 正确匹配
+            playDing();
+            firstSelected.classList.remove('selected');
+            secondSelected.classList.remove('selected');
+            firstSelected.classList.add('matched');
+            secondSelected.classList.add('matched');
+            
+            remainingPairs--;
+            masteredCount++;
+            progressInfo.innerText = "Words Mastered: " + masteredCount;
+            firstSelected = null;
+            boardLocked = false;
+            
+            if (remainingPairs === 0) {
+                setTimeout(levelComplete, 700);
+            }
+        } else {
+            // 错误匹配
+            playError();
+            firstSelected.classList.add('shake');
+            secondSelected.classList.add('shake');
+            
+            setTimeout(() => {
+                firstSelected.classList.remove('selected', 'shake');
+                secondSelected.classList.remove('selected', 'shake');
+                firstSelected = null;
+                boardLocked = false;
+            }, 500);
+        }
+    }
 }
 
-/* Styling for the primary and secondary lines inside a tile */
-.tile .main {
-  /* Adjust font size and allow wrapping so longer pinyin words fit within the tile */
-  /* Reduce font size slightly and allow words to wrap so that long pinyin
-     expressions like zìxíngchē or huǒchēzhàn stay within the tile */
-  /* Increase main text size for better readability on larger tiles */
-  font-size: 1.0rem;
-  font-weight: bold;
-  line-height: 1.1;
-  text-align: center;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  padding: 0 2px;
+function levelComplete() {
+    playTada();
+    
+    let story = "";
+    if (currentLevel <= storyLines.length) {
+        story = storyLines[currentLevel - 1];
+    } else {
+        story = "You conquer Level " + currentLevel + " of the Castle! You climb higher up the tower. The Crown of Wisdom awaits at the top!";
+    }
+    
+    modalTitle.innerText = "Level " + currentLevel + " Cleared!";
+    storyText.innerText = story;
+    nextBtn.innerText = "Continue Journey";
+    modal.style.display = 'flex';
 }
 
-/* Show secondary string below the main text for additional context */
-.tile .sub {
-  /* Increase secondary text size (pinyin) for readability */
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-top: -2px;
-  opacity: 0.9;
-  /* Display the secondary line (translation) */
-  display: block;
-  /* Black text for secondary line as well */
-  color: #000;
+function showWinScreen() {
+    playTada();
+    modalTitle.innerText = "Ultimate Victory!";
+    storyText.innerText = "Incredible! You have mastered EVERY SINGLE WORD in the Lexicon! You found the Legendary Crown of Wisdom. You are the true Word Master!";
+    nextBtn.innerText = "Play Again";
+    modal.style.display = 'flex';
+    globalWordIndex = 0;
+    currentLevel = 0; 
+    masteredCount = 0;
+    allWords = shuffle(allWords);
 }
 
-.tile.selected {
-  outline: 3px solid #f6e58d;
-  transform: scale(1.05);
+function nextLevel() {
+    modal.style.display = 'none';
+    currentLevel++;
+    loadLevel();
 }
 
-/* Shake animation used to indicate an incorrect match */
-.tile.shake {
-  animation: shake 0.4s;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-}
-
-#next-level {
-  margin-top: 12px;
-  padding: 10px 20px;
-  font-size: 1rem;
-  background-color: #ffae42;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-#next-level:hover {
-  background-color: #ff9a00;
-}
-
-/* Remove english-story specific styling as level stories will be shown in the header */
-
-/* Timer styling */
-#timer-display {
-  margin-left: 8px;
-}
-
-/* Modal styling for game over prompt */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal-content {
-  background: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  text-align: center;
-  max-width: 400px;
-  width: 80%;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-.modal-content .input-group {
-  margin-bottom: 12px;
-}
-
-.modal-content input[type="text"] {
-  padding: 6px;
-  width: 80%;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.modal-content button {
-  margin: 4px;
-  padding: 8px 12px;
-  background-color: #ffae42;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.modal-content button:hover {
-  background-color: #ff9a00;
-}
-
-/* Leaderboard styling */
-#leaderboard-section {
-  margin-top: 20px;
-}
-
-#leaderboard-section h2 {
-  margin-bottom: 8px;
-}
-
-#leaderboard-list {
-  list-style: decimal;
-  padding-left: 20px;
-  text-align: left;
-}
+// 启动游戏
+loadLevel();
+</script>
+</body>
+</html>
